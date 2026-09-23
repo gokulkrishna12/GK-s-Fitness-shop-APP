@@ -1,56 +1,50 @@
-# Welcome to your Expo app 👋
+# 🏋️‍♂️ GK's Fitness Shop
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A premium mobile e-commerce application for gym gear, supplements, and fitness accessories. Built with React Native and Expo, featuring seamless payment integration and real-time order tracking.
 
-## Get started
+## ✨ Key Features
+* **Secure Authentication:** User login and registration with state management.
+* **Product Catalog:** Browse categories like Whey Proteins, Creatine, Gym Equipment, and more.
+* **Cart & Wishlist:** Dynamic state management that instantly syncs and clears upon logout.
+* **Seamless Checkout:** Fully integrated with **Razorpay** for secure payments.
+* **Order Management:** Track order status, view history, and cancel active orders directly from the app.
+* **Over-The-Air Updates:** Configured with EAS Update for instant JavaScript code pushes without full APK rebuilds.
 
-1. Install dependencies
+## 🛠️ Tech Stack
+* **Frontend:** React Native, Expo Router, Lucide-React-Native
+* **Backend:** Node.js, Express, MongoDB (Deployed on AWS EC2 & RDS)
+* **Payments:** Razorpay (`react-native-razorpay`)
+* **Deployment & CI/CD:** Expo Application Services (EAS Build & EAS Update)
 
+## 🚀 Getting Started
+
+### Prerequisites
+Make sure you have Node.js installed and the Expo CLI configured globally.
+
+### Installation
+1. Clone the repository:
    ```bash
-   npm install
-   ```
+   git clone [https://github.com/your-username/gks-fitness-shop.git](https://github.com/your-username/gks-fitness-shop.git)
+Navigate to the project directory:
 
-2. Start the app
+Bash
+cd MyApp
+Install dependencies:
 
-   ```bash
-   npx expo start
-   ```
+Bash
+npm install
+Start the Expo development server:
 
-In the output, you'll find options to open the app in a
+Bash
+npx expo start
+📦 Building for Android
+This project is configured for EAS builds. To generate a standalone APK:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Bash
+eas build -p android --profile preview
+🔄 Pushing OTA Updates
+To push instant JavaScript/UI changes to installed apps without rebuilding the APK:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Bash
+eas update --branch preview --message "Your update message here"
+Developed by GokulKrishna | 2026

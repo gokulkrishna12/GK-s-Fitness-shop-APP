@@ -1,18 +1,37 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, StatusBar } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { Slot } from 'expo-router';
+import Toast from 'react-native-toast-message';
+import { AuthProvider } from '../context/AuthContext';
+import { ShopProvider } from '../context/ShopContext';
+import Navbar from '../components/Navbar';
+import ChatAssistant from '../components/ChatAssistant';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ShopProvider>
+          <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+            <StatusBar barStyle="light-content" backgroundColor="#140e0a" />
+
+            <Navbar />
+
+            <View style={styles.mainContainer}>
+              <Slot />
+            </View>
+
+            <ChatAssistant />
+            <Toast />
+          </SafeAreaView>
+        </ShopProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#140e0a' },
+  mainContainer: { flex: 1, backgroundColor: '#16161a' },
+});
