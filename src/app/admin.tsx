@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, Modal, ActivityIndicator, Dimensions, DimensionValue } from 'react-native';
 import { router } from 'expo-router';
-import { DollarSign, ShoppingBag, Package, AlertTriangle, Trash2, Plus, Edit, X, Upload, MapPin, ChevronDown } from 'lucide-react-native';
+import { DollarSign, ShoppingBag, Package, AlertTriangle, Trash2, Plus, Edit, X, MapPin, ChevronDown } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
-import * as ImagePicker from 'expo-image-picker';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
@@ -60,10 +59,7 @@ export default function AdminScreen() {
   
   const [showProductModal, setShowProductModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [productForm, setProductForm] = useState({ _id: '', name: '', price: '', category: '', countInStock: '', description: '' });
-  
-  const [imageFiles, setImageFiles] = useState<any[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [productForm, setProductForm] = useState({ _id: '', name: '', price: '', category: '', countInStock: '', description: '', image: '' });
 
   const adminCancelMessage = "Sorry, unfortunately cancelled by Admin. You can clear the history and order again. This order history can be deleted by Admin whenever, so you might not see it often.";
 
@@ -133,29 +129,6 @@ export default function AdminScreen() {
     }).sort((a, b) => b.revenue - a.revenue);
   }, [orders, products]);
 
-  const handlePickImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets) {
-      const selectedAssets = result.assets.slice(0, 5);
-      setImagePreviews(selectedAssets.map(a => a.uri));
-      
-      const formattedFiles = selectedAssets.map(a => {
-        const uriParts = a.uri.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        return {
-          uri: a.uri,
-          name: `product_${Date.now()}.${fileType}`,
-          type: `image/${fileType}`,
-        };
-      });
-      setImageFiles(formattedFiles as any);
-    }
-  };
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;
@@ -194,19 +167,15 @@ export default function AdminScreen() {
     formData.append('stock', productForm.countInStock);
     formData.append('category', productForm.category);
     formData.append('description', productForm.description);
-
-    imageFiles.forEach(file => formData.append('images', file));
+    if (productForm.image) {
+      formData.append('image', productForm.image);
+    }
 
     try {
       if (isEditing) {
         await api.put(`/products/${productForm._id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         Toast.show({ type: 'success', text1: 'Product updated!' });
       } else {
-        if (imageFiles.length === 0) {
-          Toast.show({ type: 'error', text1: 'Please upload at least one image!' });
-          setIsSaving(false);
-          return;
-        }
         await api.post('/products', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         Toast.show({ type: 'success', text1: 'Product created!' });
       }
@@ -336,9 +305,12 @@ export default function AdminScreen() {
         <View style={styles.itemActions}>
           <TouchableOpacity onPress={() => { 
             setIsEditing(true); 
-            setProductForm({ ...p, price: p.price.toString(), countInStock: stock.toString() } as any); 
-            setImagePreviews(p.images?.length ? p.images : (p.image ? [p.image] : [])); 
-            setImageFiles([]); 
+            setProductForm({ 
+              ...p, 
+              price: p.price.toString(), 
+              countInStock: stock.toString(),
+              image: (p.images && p.images[0]) || p.image || ''
+            } as any); 
             setShowProductModal(true); 
           }}>
             <Edit size={18} color="#2ec4b6" />
@@ -455,16 +427,19 @@ export default function AdminScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Product Images ({imagePreviews.length}/5)</Text>
-                <TouchableOpacity style={styles.uploadBtn} onPress={handlePickImages}>
-                  <Upload size={18} color={COLORS.surface} />
-                  <Text style={styles.uploadText}>Choose Images</Text>
-                </TouchableOpacity>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                  {imagePreviews.map((uri, idx) => (
-                    <Image key={idx} source={{ uri }} style={[styles.previewThumb, { marginRight: 8 }]} />
-                  ))}
-                </ScrollView>
+                <Text style={styles.label}>Product Image URL</Text>
+                <TextInput 
+                  style={styles.input} 
+                  value={productForm.image} 
+                  onChangeText={(val) => setProductForm({ ...productForm, image: val })} 
+                  placeholder="https://example.com/product.jpg" 
+                  placeholderTextColor="rgba(255,255,255,0.3)" 
+                />
+                {productForm.image ? (
+                  <View style={{ marginTop: 10 }}>
+                    <Image source={{ uri: productForm.image }} style={styles.previewThumb} />
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.formGroup}>
@@ -556,7 +531,7 @@ export default function AdminScreen() {
           <View style={styles.section}>
             <View style={styles.tableHeader}>
               <Text style={styles.sectionTitle}>Inventory</Text>
-              <TouchableOpacity style={styles.addBtn} onPress={() => { setIsEditing(false); setProductForm({ _id: '', name: '', price: '', category: '', countInStock: '', description: '' }); setImagePreviews([]); setImageFiles([]); setShowProductModal(true); }}>
+              <TouchableOpacity style={styles.addBtn} onPress={() => { setIsEditing(false); setProductForm({ _id: '', name: '', price: '', category: '', countInStock: '', description: '', image: '' }); setShowProductModal(true); }}>
                 <Plus size={16} color={COLORS.surface} />
                 <Text style={styles.addBtnText}>New Product</Text>
               </TouchableOpacity>
@@ -670,8 +645,7 @@ const styles = StyleSheet.create({
   formRow: { flexDirection: 'row', gap: SPACING.sm },
   label: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginBottom: 4, textTransform: 'uppercase' },
   input: { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.sm, color: COLORS.surface, paddingHorizontal: SPACING.md, height: 44, fontSize: 14 },
-  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', paddingVertical: 10, borderRadius: RADIUS.sm },
-  uploadText: { color: COLORS.surface, fontSize: 13, fontWeight: '700' },
+
   previewThumb: { width: 50, height: 50, borderRadius: 6, resizeMode: 'cover' },
   emptyChart: { height: 100, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontStyle: 'italic' },

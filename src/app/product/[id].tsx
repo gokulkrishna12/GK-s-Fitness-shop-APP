@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, Modal, ActivityIndicator, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ShoppingCart, Zap, Star, Camera, Upload, Trash2, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react-native';
+import { ShoppingCart, Zap, Star, Trash2, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
-import * as ImagePicker from 'expo-image-picker';
 import api from '../../services/api';
 import { useShop, Product } from '../../context/ShopContext';
 import { useAuth } from '../../context/AuthContext';
@@ -47,8 +46,6 @@ export default function ProductDetailsScreen() {
 
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  const [reviewImage, setReviewImage] = useState<any>(null);
-  const [reviewPreview, setReviewPreview] = useState<string | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
 
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
@@ -79,44 +76,9 @@ export default function ProductDetailsScreen() {
       setActiveImageIndex(0);
       setRating(0);
       setComment('');
-      setReviewImage(null);
-      setReviewPreview(null);
     }
   }, [id]);
 
-  const handlePickImage = async (useCamera: boolean = false) => {
-    let result;
-    if (useCamera) {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Toast.show({ type: 'error', text1: 'Camera permission is required!' });
-        return;
-      }
-      // 🔥 THE FIX: Changed MediaTypeOptions.Images to ['images']
-      result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
-    } else {
-      // 🔥 THE FIX: Changed MediaTypeOptions.Images to ['images']
-      result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
-    }
-
-    if (!result.canceled && result.assets && result.assets[0]) {
-      const asset = result.assets[0];
-      setReviewPreview(asset.uri);
-      
-      const uriParts = asset.uri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-      setReviewImage({
-        uri: asset.uri,
-        name: `review_photo.${fileType}`,
-        type: `image/${fileType}`,
-      } as any);
-    }
-  };
-
-  const clearReviewImage = () => {
-    setReviewImage(null);
-    setReviewPreview(null);
-  };
 
   const handleAddToCartClick = () => {
     if (!isAuthenticated) {
@@ -155,9 +117,6 @@ export default function ProductDetailsScreen() {
     const formData = new FormData() as any;
     formData.append('rating', rating.toString());
     formData.append('comment', comment);
-    if (reviewImage) {
-      formData.append('image', reviewImage);
-    }
 
     setSubmittingReview(true);
     try {
@@ -168,7 +127,6 @@ export default function ProductDetailsScreen() {
       Toast.show({ type: 'success', text1: 'Review submitted successfully!' });
       setComment('');
       setRating(0);
-      clearReviewImage();
 
       const res = await api.get(`/products/${id}`);
       setProduct(res.data);
@@ -357,31 +315,6 @@ export default function ProductDetailsScreen() {
             />
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Upload Photo / Use Camera</Text>
-            <View style={styles.uploadRow}>
-              <TouchableOpacity style={styles.uploadBtnPrimary} onPress={() => handlePickImage(true)}>
-                <Camera size={16} color={COLORS.surface} />
-                <Text style={styles.uploadBtnText}>Take Photo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.uploadBtnSecondary} onPress={() => handlePickImage(false)}>
-                <Upload size={16} color={COLORS.surface} />
-                <Text style={styles.uploadBtnText}>Upload Gallery</Text>
-              </TouchableOpacity>
-            </View>
-
-            {reviewPreview && (
-              <View style={styles.previewAlert}>
-                <Image source={{ uri: reviewPreview }} style={styles.previewImage} />
-                <View style={styles.previewInfo}>
-                  <Text style={styles.previewSuccess}>Image Attached</Text>
-                  <TouchableOpacity onPress={clearReviewImage}>
-                    <Text style={styles.previewRemove}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
 
           <TouchableOpacity style={[styles.submitReviewBtn, submittingReview && styles.disabled]} onPress={handleReviewSubmit} disabled={submittingReview}>
             {submittingReview ? <ActivityIndicator color={COLORS.surface} /> : <Text style={styles.submitText}>Post Review</Text>}
@@ -570,47 +503,6 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     minHeight: 90,
   },
-  uploadRow: { flexDirection: 'row', gap: SPACING.md },
-  uploadBtnPrimary: {
-    flex: 1,
-    backgroundColor: 'rgba(230,57,70,0.15)',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingVertical: 12,
-    borderRadius: RADIUS.sm,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  uploadBtnSecondary: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 12,
-    borderRadius: RADIUS.sm,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  uploadBtnText: { color: COLORS.surface, fontSize: 13, fontWeight: '700' },
-  previewAlert: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(46,196,182,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(46,196,182,0.3)',
-    borderRadius: RADIUS.sm,
-    padding: 8,
-    marginTop: 10,
-    gap: 12,
-  },
-  previewImage: { width: 45, height: 45, borderRadius: 6, resizeMode: 'cover' },
-  previewInfo: { flex: 1 },
-  previewSuccess: { color: COLORS.success, fontSize: 12, fontWeight: '700' },
-  previewRemove: { color: COLORS.accent, fontSize: 11, fontWeight: '700', marginTop: 2 },
   submitReviewBtn: {
     backgroundColor: COLORS.accent,
     paddingVertical: 14,
