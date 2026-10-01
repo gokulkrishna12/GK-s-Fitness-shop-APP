@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ImageBackground, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { router } from 'expo-router';
-import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react-native';
-import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { router } from 'expo-router';
+import { Eye, EyeOff, Fingerprint, Lock, LogIn, Mail } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Toast from 'react-native-toast-message';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 
 const heroImg = require('../../../assets/images/Home.jpg');
 
@@ -15,10 +17,22 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const { login } = useAuth();
 
+  // Check if hardware supports biometrics on mount
+  useEffect(() => {
+    (async () => {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (compatible && enrolled) {
+        setIsBiometricSupported(true);
+      }
+    })();
+  }, []);
+
   const handleLogin = async () => {
-    const formattedEmail = email.trim().toLowerCase(); // 🔥 THE FIX
+    const formattedEmail = email.trim().toLowerCase();
     if (!formattedEmail || !password) {
       Toast.show({ type: 'error', text1: 'Please enter both email and password' });
       return;
@@ -27,17 +41,56 @@ export default function Login() {
     try {
       setIsLoading(true);
       const response = await api.post('/auth/login', { email: formattedEmail, password });
-      
+
       const { user, token } = response.data;
+
+      // Save credentials for future biometric logins before triggering context
+      await AsyncStorage.setItem('token', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+
       await login(user, token);
 
       Toast.show({ type: 'success', text1: 'Welcome back Athlete!' });
-      router.replace('/' as any); 
+      router.replace('/' as any);
     } catch (error: any) {
-      Toast.show({ 
-        type: 'error', 
-        text1: error.response?.data?.message || 'Invalid email or password' 
+      Toast.show({
+        type: 'error',
+        text1: error.response?.data?.message || 'Invalid email or password'
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Unlock GK's Fitness",
+        fallbackLabel: "Use Password",
+      });
+
+      if (result.success) {
+        setIsLoading(true);
+        // Grab the saved session from the last manual login
+        const savedToken = await AsyncStorage.getItem('token');
+        const savedUserStr = await AsyncStorage.getItem('user');
+
+        if (savedToken && savedUserStr) {
+          const savedUser = JSON.parse(savedUserStr);
+          await login(savedUser, savedToken);
+
+          Toast.show({ type: 'success', text1: 'Biometric Login Successful!' });
+          router.replace('/' as any);
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'No saved session found',
+            text2: 'Please login with your password once to enable biometrics.'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Biometric error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +156,25 @@ export default function Login() {
                     </>
                   )}
                 </TouchableOpacity>
+
+                {isBiometricSupported && (
+                  <>
+                    <View style={styles.dividerContainer}>
+                      <View style={styles.divider} />
+                      <Text style={styles.dividerText}>OR</Text>
+                      <View style={styles.divider} />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.btnBiometric, isLoading && styles.btnDisabled]}
+                      onPress={handleBiometricLogin}
+                      disabled={isLoading}
+                    >
+                      <Fingerprint color={COLORS.surface} size={20} />
+                      <Text style={styles.btnBiometricText}>Login with Biometrics</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
 
               <View style={styles.footer}>
@@ -141,6 +213,14 @@ const styles = StyleSheet.create({
   btnAuth: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.accent, paddingVertical: 14, borderRadius: RADIUS.sm, gap: 8, marginTop: 8, ...SHADOWS.glow },
   btnDisabled: { opacity: 0.5 },
   btnText: { color: COLORS.surface, fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+
+  // NEW STYLES FOR BIOMETRICS
+  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
+  divider: { flex: 1, height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' },
+  dividerText: { color: 'rgba(255, 255, 255, 0.5)', paddingHorizontal: SPACING.md, fontSize: 12, fontWeight: '700' },
+  btnBiometric: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingVertical: 14, borderRadius: RADIUS.sm, gap: 8 },
+  btnBiometricText: { color: COLORS.surface, fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: SPACING.xl },
   footerText: { color: 'rgba(255, 255, 255, 0.55)', fontSize: 14 },
   footerLink: { color: COLORS.accent, fontSize: 14, fontWeight: '700' }

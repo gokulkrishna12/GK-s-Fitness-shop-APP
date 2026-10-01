@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { Package, Check, Truck, CheckCircle, PackageX, Trash2, XCircle, AlertTriangle, X } from 'lucide-react-native';
+import { AlertTriangle, Check, CheckCircle, Package, PackageX, Trash2, Truck, X, XCircle } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
-import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import ScreenContainer from '../components/ScreenContainer';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 interface OrderItem {
   _id?: string;
@@ -72,14 +72,14 @@ const OrderTracker = ({ status, cancelReason }: { status: string, cancelReason?:
         return (
           <View key={step.id} style={styles.stepWrapper}>
             <View style={[
-              styles.stepIconBox, 
+              styles.stepIconBox,
               isCompleted && styles.stepCompletedBox,
               isActive && styles.stepActiveBox
             ]}>
               <Icon size={16} color={isCompleted ? COLORS.bgDark : isActive ? COLORS.accent : 'rgba(255,255,255,0.4)'} />
             </View>
             <Text style={[
-              styles.stepLabel, 
+              styles.stepLabel,
               (isCompleted || isActive) && { color: isCompleted ? COLORS.success : COLORS.accent }
             ]}>
               {step.label}
@@ -91,10 +91,10 @@ const OrderTracker = ({ status, cancelReason }: { status: string, cancelReason?:
   );
 };
 
-// 👇 THIS IS THE CRITICAL LINE EXPO WAS LOOKING FOR
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { isAuthenticated } = useAuth();
 
   const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
@@ -110,24 +110,33 @@ export default function OrdersScreen() {
     "Other"
   ];
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const res = await api.get('/orders/myorders');
-        setOrders(res.data || []);
-      } catch (error) {
-        console.error('Failed to fetch orders:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchOrders = useCallback(async (isRefresh = false) => {
+    try {
+      if (!isRefresh) setLoading(true);
+      const res = await api.get('/orders/myorders');
+      setOrders(res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+    } finally {
+      if (!isRefresh) setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
+  useEffect(() => {
     if (isAuthenticated) {
       fetchOrders();
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchOrders]);
+
+  const onRefresh = useCallback(() => {
+    if (isAuthenticated) {
+      setRefreshing(true);
+      fetchOrders(true);
+    }
+  }, [isAuthenticated, fetchOrders]);
 
   const confirmCancelOrder = async () => {
     if (!cancelReason) {
@@ -188,28 +197,39 @@ export default function OrdersScreen() {
   if (!isAuthenticated || orders.length === 0) {
     return (
       <ScreenContainer>
-        <View style={styles.pageContent}>
-          <Text style={styles.headerTitle}>My Orders</Text>
-          
-          <View style={[styles.emptyContainer, { marginTop: 40 }]}>
-            <View style={styles.emptyCard}>
-              <PackageX size={64} color={COLORS.accent} style={{ marginBottom: SPACING.md }} />
-              <Text style={styles.emptyTitle}>{!isAuthenticated ? 'Login Required' : 'No Orders Found'}</Text>
-              <Text style={styles.emptyText}>{!isAuthenticated ? 'Please login to view your orders.' : "You haven't placed any orders yet."}</Text>
-              
-              <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push(!isAuthenticated ? '/Auth/login' as any : '/catalog' as any)}>
-                <Text style={styles.btnPrimaryText}>{!isAuthenticated ? 'Login Now' : 'Start Shopping'}</Text>
-              </TouchableOpacity>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.accent}
+              colors={[COLORS.accent]}
+            />
+          }
+        >
+          <View style={styles.pageContent}>
+            <Text style={styles.headerTitle}>My Orders</Text>
+
+            <View style={[styles.emptyContainer, { marginTop: 40 }]}>
+              <View style={styles.emptyCard}>
+                <PackageX size={64} color={COLORS.accent} style={{ marginBottom: SPACING.md }} />
+                <Text style={styles.emptyTitle}>{!isAuthenticated ? 'Login Required' : 'No Orders Found'}</Text>
+                <Text style={styles.emptyText}>{!isAuthenticated ? 'Please login to view your orders.' : "You haven't placed any orders yet."}</Text>
+
+                <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push(!isAuthenticated ? '/Auth/login' as any : '/catalog' as any)}>
+                  <Text style={styles.btnPrimaryText}>{!isAuthenticated ? 'Login Now' : 'Start Shopping'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </ScreenContainer>
     );
   }
 
   return (
     <ScreenContainer>
-      
       {/* CANCEL MODAL */}
       <Modal visible={orderToCancel !== null} transparent={true} animationType="fade" onRequestClose={() => setOrderToCancel(null)}>
         <View style={styles.modalOverlay}>
@@ -227,8 +247,8 @@ export default function OrdersScreen() {
 
             <View style={styles.reasonList}>
               {cancelReasons.map(reason => (
-                <TouchableOpacity 
-                  key={reason} 
+                <TouchableOpacity
+                  key={reason}
                   style={[styles.reasonRadio, cancelReason === reason && styles.reasonSelected]}
                   onPress={() => { setCancelReason(reason); if (reason !== 'Other') setOtherReasonText(''); }}
                 >
@@ -290,73 +310,86 @@ export default function OrdersScreen() {
         </View>
       </Modal>
 
-      <View style={styles.pageContent}>
-        <Text style={styles.headerTitle}>My Orders</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.accent}
+            colors={[COLORS.accent]}
+          />
+        }
+      >
+        <View style={styles.pageContent}>
+          <Text style={styles.headerTitle}>My Orders</Text>
 
-        <View style={styles.ordersList}>
-        {orders.map(order => {
-          const status = order.paymentStatus === 'Completed' ? 'Pending' : (order.paymentStatus || 'Pending');
-          const isCancelled = status === 'Cancelled';
-          const isDelivered = status === 'Delivered';
+          <View style={styles.ordersList}>
+            {orders.map(order => {
+              const status = order.paymentStatus === 'Completed' ? 'Pending' : (order.paymentStatus || 'Pending');
+              const isCancelled = status === 'Cancelled';
+              const isDelivered = status === 'Delivered';
 
-          return (
-            <View key={order._id} style={styles.orderCard}>
-              <View style={styles.orderHeader}>
-                <View style={styles.orderHeaderInfo}>
-                  <Text style={styles.orderIdText}>Order ID: <Text style={{ color: COLORS.surface }}>{order._id}</Text></Text>
-                  <Text style={styles.orderDateText}>Date: {new Date(order.createdAt).toLocaleDateString()}</Text>
-                </View>
-
-                <View style={styles.orderHeaderActions}>
-                  <Text style={styles.orderTotal}>₹{order.totalAmount?.toLocaleString()}</Text>
-                  {(isCancelled || isDelivered) && (
-                    <TouchableOpacity onPress={() => setOrderToDelete(order._id)}>
-                      <Trash2 size={18} color="rgba(255,255,255,0.4)" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.orderBody}>
-                <View style={styles.itemsColumn}>
-                  {order.orderItems?.map((item, idx) => (
-                    <View key={item._id || idx} style={styles.itemRow}>
-                      <Image source={{ uri: item.product?.images?.[0] || item.image || 'https://via.placeholder.com/56' }} style={styles.itemImg} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                        <Text style={styles.itemSub}>Qty: {item.qty} | ₹{item.price}</Text>
-                      </View>
+              return (
+                <View key={order._id} style={styles.orderCard}>
+                  <View style={styles.orderHeader}>
+                    <View style={styles.orderHeaderInfo}>
+                      <Text style={styles.orderIdText}>Order ID: <Text style={{ color: COLORS.surface }}>{order._id}</Text></Text>
+                      <Text style={styles.orderDateText}>Date: {new Date(order.createdAt).toLocaleDateString()}</Text>
                     </View>
-                  ))}
-                </View>
 
-                <OrderTracker status={status} cancelReason={order.cancelReason} />
-
-                {!isCancelled && !isDelivered && (
-                  <View style={styles.footerActions}>
-                    <TouchableOpacity style={styles.cancelOrderBtn} onPress={() => setOrderToCancel(order._id)}>
-                      <Text style={styles.cancelOrderText}>Cancel Order</Text>
-                    </TouchableOpacity>
+                    <View style={styles.orderHeaderActions}>
+                      <Text style={styles.orderTotal}>₹{order.totalAmount?.toLocaleString()}</Text>
+                      {(isCancelled || isDelivered) && (
+                        <TouchableOpacity onPress={() => setOrderToDelete(order._id)}>
+                          <Trash2 size={18} color="rgba(255,255,255,0.4)" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                )}
-              </View>
-            </View>
-          );
-        })}
+
+                  <View style={styles.orderBody}>
+                    <View style={styles.itemsColumn}>
+                      {order.orderItems?.map((item, idx) => (
+                        <View key={item._id || idx} style={styles.itemRow}>
+                          <Image source={{ uri: item.product?.images?.[0] || item.image || 'https://via.placeholder.com/56' }} style={styles.itemImg} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                            <Text style={styles.itemSub}>Qty: {item.qty} | ₹{item.price}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+
+                    <OrderTracker status={status} cancelReason={order.cancelReason} />
+
+                    {!isCancelled && !isDelivered && (
+                      <View style={styles.footerActions}>
+                        <TouchableOpacity style={styles.cancelOrderBtn} onPress={() => setOrderToCancel(order._id)}>
+                          <Text style={styles.cancelOrderText}>Cancel Order</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#16161a' },
-  scrollContent: { paddingBottom: 90, paddingHorizontal: SPACING.md },
+  scrollContent: { paddingBottom: 90 },
   pageContent: { paddingHorizontal: SPACING.md },
   center: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: COLORS.surface, marginTop: 10, fontSize: 16 },
   headerTitle: { fontSize: 28, fontWeight: '900', color: COLORS.surface, marginBottom: SPACING.lg, textTransform: 'uppercase' },
-  
+
   emptyContainer: { padding: SPACING.lg },
   emptyCard: {
     width: '100%',

@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Image, Dimensions } from 'react-native';
-import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Dimensions, Image, ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +28,7 @@ const categories = [
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -35,51 +36,71 @@ export default function Home() {
     }
   }, [isAuthenticated]);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // Refresh local session/storage state
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
+
   return (
     <ScreenContainer>
-      <ImageBackground source={heroImg} style={styles.hero} resizeMode="cover">
-        <LinearGradient
-          colors={['rgba(26, 18, 11, 0.55)', 'rgba(13, 9, 7, 0.85)']}
-          style={styles.heroGradient}
-        >
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>Everything You Need, All in One Place.</Text>
-            <Text style={styles.heroSubtitle}>
-              Discover our curated collection of premium gym gear and supplements. Shop the best quality to fuel your performance.
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.btnCta} 
-              activeOpacity={0.8}
-              onPress={() => router.push('/catalog' as any)}
-            >
-              <Text style={styles.btnCtaText}>START SHOPPING</Text>
-            </TouchableOpacity>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.accent}
+            colors={[COLORS.accent]}
+          />
+        }
+      >
+        <ImageBackground source={heroImg} style={styles.hero} resizeMode="cover">
+          <LinearGradient
+            colors={['rgba(26, 18, 11, 0.55)', 'rgba(13, 9, 7, 0.85)']}
+            style={styles.heroGradient}
+          >
+            <View style={styles.heroContent}>
+              <Text style={styles.heroTitle}>Everything You Need, All in One Place.</Text>
+              <Text style={styles.heroSubtitle}>
+                Discover our curated collection of premium gym gear and supplements. Shop the best quality to fuel your performance.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.btnCta}
+                activeOpacity={0.8}
+                onPress={() => router.push('/catalog' as any)}
+              >
+                <Text style={styles.btnCtaText}>START SHOPPING</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </ImageBackground>
+
+        <View style={styles.categoriesSection}>
+          <Text style={styles.sectionTitle}>Shop by Category</Text>
+          <Text style={styles.sectionSubtitle}>Browse our premium collection</Text>
+
+          <View style={styles.categoryGrid}>
+            {categories.map((cat, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.categoryCard}
+                activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/catalog' as any, params: { category: cat.name } })}
+              >
+                <View style={styles.circle}>
+                  <Image source={cat.image} style={styles.categoryImage} />
+                </View>
+                <Text style={[styles.categoryName, { textAlign: 'center' }]} numberOfLines={2}>{cat.name}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </LinearGradient>
-      </ImageBackground>
-
-      <View style={styles.categoriesSection}>
-        <Text style={styles.sectionTitle}>Shop by Category</Text>
-        <Text style={styles.sectionSubtitle}>Browse our premium collection</Text>
-
-        <View style={styles.categoryGrid}>
-          {categories.map((cat, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={styles.categoryCard}
-              activeOpacity={0.7}
-              onPress={() => router.push({ pathname: '/catalog' as any, params: { category: cat.name } })}
-            >
-              <View style={styles.circle}>
-                <Image source={cat.image} style={styles.categoryImage} />
-              </View>
-              <Text style={[styles.categoryName, { textAlign: 'center' }]} numberOfLines={2}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
         </View>
-      </View>
-
+      </ScrollView>
     </ScreenContainer>
   );
 }

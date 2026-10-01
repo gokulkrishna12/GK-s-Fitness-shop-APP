@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, Modal, ActivityIndicator, Dimensions } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { ShoppingCart, Zap, Star, Trash2, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { AlertTriangle, ChevronLeft, ChevronRight, Share2, ShoppingCart, Star, Trash2, X, Zap } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, Image, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
-import api from '../../services/api';
-import { useShop, Product } from '../../context/ShopContext';
-import { useAuth } from '../../context/AuthContext';
 import ProductCard from '../../components/ProductCard';
 import ScreenContainer from '../../components/ScreenContainer';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import { Product, useShop } from '../../context/ShopContext';
+import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -79,6 +79,19 @@ export default function ProductDetailsScreen() {
     }
   }, [id]);
 
+  const handleShare = async () => {
+    if (!product) return;
+    try {
+      const deepLinkUrl = `myapp://product/${id}`;
+      await Share.share({
+        message: `Check out ${product.name} at GK's Fit Shop! 🚀 Grab it here: ${deepLinkUrl}`,
+        url: deepLinkUrl,
+        title: product.name
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
 
   const handleAddToCartClick = () => {
     if (!isAuthenticated) {
@@ -181,7 +194,6 @@ export default function ProductDetailsScreen() {
   return (
     <ScreenContainer>
 
-      {/* Delete Review Modal */}
       <Modal visible={reviewToDelete !== null} transparent={true} animationType="fade" onRequestClose={() => setReviewToDelete(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.customModal}>
@@ -203,7 +215,6 @@ export default function ProductDetailsScreen() {
         </View>
       </Modal>
 
-      {/* Fullscreen Image Zoom Modal */}
       <Modal visible={isModalOpen} transparent={true} animationType="fade" onRequestClose={() => setIsModalOpen(false)}>
         <View style={styles.fullscreenModal} onTouchEnd={() => setIsModalOpen(false)}>
           <TouchableOpacity style={styles.fsClose} onPress={() => setIsModalOpen(false)}>
@@ -226,161 +237,157 @@ export default function ProductDetailsScreen() {
       </Modal>
 
       <View style={styles.pageContent}>
-        {/* Main Product Grid Section */}
         <View style={styles.grid}>
-        
-        {/* Gallery */}
-        <View style={styles.gallery}>
-          <TouchableOpacity style={styles.mainImageContainer} activeOpacity={0.9} onPress={() => setIsModalOpen(true)}>
-            <Image source={{ uri: images[activeImageIndex] }} style={styles.mainImage} resizeMode="cover" />
-            <Text style={styles.expandHint}>Click to Enlarge</Text>
-          </TouchableOpacity>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnails}>
-            {images.map((img, idx) => (
-              <TouchableOpacity key={idx} style={[styles.thumbBtn, activeImageIndex === idx && styles.thumbActive]} onPress={() => setActiveImageIndex(idx)}>
-                <Image source={{ uri: img }} style={styles.thumbImage} resizeMode="contain" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Info Section */}
-        <View style={styles.infoSection}>
-          {product.category && (
-            <View style={styles.badgeCategory}>
-              <Text style={styles.badgeCategoryText}>{product.category}</Text>
-            </View>
-          )}
-
-          <Text style={styles.productTitle}>{product.name}</Text>
-
-          <View style={styles.ratingRow}>
-            <Star size={16} color={COLORS.warning} fill={COLORS.warning} />
-            <Text style={styles.ratingText}>{liveRating.toFixed(1)} ({liveNumReviews} reviews)</Text>
-          </View>
-
-          <Text style={styles.priceTag}>₹{product.price}</Text>
-
-          <Text style={[styles.stockStatus, isOutOfStock ? styles.outStock : styles.inStock]}>
-            {isOutOfStock ? 'Out of Stock' : `In Stock (${stockCount} units available)`}
-          </Text>
-
-          <Text style={styles.description}>{product.description}</Text>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={[styles.btnCart, isOutOfStock && styles.disabled]} onPress={handleAddToCartClick} disabled={isOutOfStock}>
-              <ShoppingCart size={18} color={COLORS.surface} />
-              <Text style={styles.btnText}>Add to Cart</Text>
+          <View style={styles.gallery}>
+            <TouchableOpacity style={styles.mainImageContainer} activeOpacity={0.9} onPress={() => setIsModalOpen(true)}>
+              <Image source={{ uri: images[activeImageIndex] }} style={styles.mainImage} resizeMode="cover" />
+              <Text style={styles.expandHint}>Click to Enlarge</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.btnOrder, isOutOfStock && styles.disabled]} onPress={handleBuyNowClick} disabled={isOutOfStock}>
-              <Zap size={18} color={COLORS.surface} />
-              <Text style={styles.btnText}>Buy Now</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-      </View>
-
-      {/* Reviews Section */}
-      <View style={styles.reviewsSection}>
-        <Text style={styles.sectionHeaderTitle}>Athlete Reviews & Community Photos</Text>
-
-        {/* Leave Review Form */}
-        <View style={styles.reviewCardStyle}>
-          <Text style={styles.formTitle}>Leave Your Review</Text>
-          
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Rating</Text>
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                  <Star size={28} color={rating >= star ? COLORS.warning : 'rgba(255,255,255,0.3)'} fill={rating >= star ? COLORS.warning : 'transparent'} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnails}>
+              {images.map((img, idx) => (
+                <TouchableOpacity key={idx} style={[styles.thumbBtn, activeImageIndex === idx && styles.thumbActive]} onPress={() => setActiveImageIndex(idx)}>
+                  <Image source={{ uri: img }} style={styles.thumbImage} resizeMode="contain" />
                 </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.infoSection}>
+            {product.category && (
+              <View style={styles.badgeCategory}>
+                <Text style={styles.badgeCategoryText}>{product.category}</Text>
+              </View>
+            )}
+
+            <View style={styles.titleRow}>
+              <Text style={styles.productTitle}>{product.name}</Text>
+              <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                <Share2 size={24} color={COLORS.surface} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.ratingRow}>
+              <Star size={16} color={COLORS.warning} fill={COLORS.warning} />
+              <Text style={styles.ratingText}>{liveRating.toFixed(1)} ({liveNumReviews} reviews)</Text>
+            </View>
+
+            <Text style={styles.priceTag}>₹{product.price}</Text>
+
+            <Text style={[styles.stockStatus, isOutOfStock ? styles.outStock : styles.inStock]}>
+              {isOutOfStock ? 'Out of Stock' : `In Stock (${stockCount} units available)`}
+            </Text>
+
+            <Text style={styles.description}>{product.description}</Text>
+
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={[styles.btnCart, isOutOfStock && styles.disabled]} onPress={handleAddToCartClick} disabled={isOutOfStock}>
+                <ShoppingCart size={18} color={COLORS.surface} />
+                <Text style={styles.btnText}>Add to Cart</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.btnOrder, isOutOfStock && styles.disabled]} onPress={handleBuyNowClick} disabled={isOutOfStock}>
+                <Zap size={18} color={COLORS.surface} />
+                <Text style={styles.btnText}>Buy Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+        </View>
+
+        <View style={styles.reviewsSection}>
+          <Text style={styles.sectionHeaderTitle}>Athlete Reviews & Community Photos</Text>
+
+          <View style={styles.reviewCardStyle}>
+            <Text style={styles.formTitle}>Leave Your Review</Text>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Rating</Text>
+              <View style={styles.starsContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                    <Star size={28} color={rating >= star ? COLORS.warning : 'rgba(255,255,255,0.3)'} fill={rating >= star ? COLORS.warning : 'transparent'} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Your Feedback</Text>
+              <TextInput
+                style={styles.textArea}
+                multiline
+                numberOfLines={3}
+                placeholder="How did this product impact your training?"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={comment}
+                onChangeText={setComment}
+              />
+            </View>
+
+            <TouchableOpacity style={[styles.submitReviewBtn, submittingReview && styles.disabled]} onPress={handleReviewSubmit} disabled={submittingReview}>
+              {submittingReview ? <ActivityIndicator color={COLORS.surface} /> : <Text style={styles.submitText}>Post Review</Text>}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.reviewsList}>
+            {product.reviews && product.reviews.length > 0 ? (
+              product.reviews.map((rev, idx) => {
+                const isAuthor = user?._id === rev.user;
+                const authorName = rev.name || (isAuthor ? user?.name : 'Athlete');
+
+                return (
+                  <View key={idx} style={styles.reviewCardStyle}>
+                    <View style={styles.reviewHeader}>
+                      <View>
+                        <Text style={styles.verifiedLabel}>Verified Athlete</Text>
+                        <Text style={styles.reviewerName}>{authorName}</Text>
+                        <Text style={styles.reviewDate}>
+                          {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : 'Just now'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.reviewActionsCol}>
+                        <View style={styles.starsRow}>
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={14} color={i < rev.rating ? COLORS.warning : 'rgba(255,255,255,0.2)'} fill={i < rev.rating ? COLORS.warning : 'transparent'} />
+                          ))}
+                        </View>
+                        {(isAuthor || isAdmin) && (
+                          <TouchableOpacity style={styles.deleteReviewBtn} onPress={() => setReviewToDelete(rev._id)}>
+                            <Trash2 size={13} color={COLORS.accent} />
+                            <Text style={styles.deleteReviewText}>Delete</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+
+                    <Text style={styles.reviewComment}>{rev.comment}</Text>
+                    {rev.image && (
+                      <Image source={{ uri: rev.image }} style={styles.reviewPhotoThumb} />
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.noReviewsBox}>
+                <Text style={styles.noReviewsText}>No reviews yet. Be the first athlete to review this product!</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {relatedProducts.length > 0 && (
+          <View style={styles.relatedSection}>
+            <Text style={styles.sectionHeaderTitle}>Related Gear</Text>
+            <View style={styles.relatedGrid}>
+              {relatedProducts.map(prod => (
+                <ProductCard key={prod._id || prod.id} product={prod} />
               ))}
             </View>
           </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Your Feedback</Text>
-            <TextInput
-              style={styles.textArea}
-              multiline
-              numberOfLines={3}
-              placeholder="How did this product impact your training?"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={comment}
-              onChangeText={setComment}
-            />
-          </View>
-
-
-          <TouchableOpacity style={[styles.submitReviewBtn, submittingReview && styles.disabled]} onPress={handleReviewSubmit} disabled={submittingReview}>
-            {submittingReview ? <ActivityIndicator color={COLORS.surface} /> : <Text style={styles.submitText}>Post Review</Text>}
-          </TouchableOpacity>
-        </View>
-
-        {/* Reviews List */}
-        <View style={styles.reviewsList}>
-          {product.reviews && product.reviews.length > 0 ? (
-            product.reviews.map((rev, idx) => {
-              const isAuthor = user?._id === rev.user;
-              const authorName = rev.name || (isAuthor ? user?.name : 'Athlete');
-
-              return (
-                <View key={idx} style={styles.reviewCardStyle}>
-                  <View style={styles.reviewHeader}>
-                    <View>
-                      <Text style={styles.verifiedLabel}>Verified Athlete</Text>
-                      <Text style={styles.reviewerName}>{authorName}</Text>
-                      <Text style={styles.reviewDate}>
-                        {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : 'Just now'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.reviewActionsCol}>
-                      <View style={styles.starsRow}>
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={14} color={i < rev.rating ? COLORS.warning : 'rgba(255,255,255,0.2)'} fill={i < rev.rating ? COLORS.warning : 'transparent'} />
-                        ))}
-                      </View>
-                      {(isAuthor || isAdmin) && (
-                        <TouchableOpacity style={styles.deleteReviewBtn} onPress={() => setReviewToDelete(rev._id)}>
-                          <Trash2 size={13} color={COLORS.accent} />
-                          <Text style={styles.deleteReviewText}>Delete</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-
-                  <Text style={styles.reviewComment}>{rev.comment}</Text>
-                  {rev.image && (
-                    <Image source={{ uri: rev.image }} style={styles.reviewPhotoThumb} />
-                  )}
-                </View>
-              );
-            })
-          ) : (
-            <View style={styles.noReviewsBox}>
-              <Text style={styles.noReviewsText}>No reviews yet. Be the first athlete to review this product!</Text>
-            </View>
-          )}
-        </View>
-
-      </View>
-
-      {/* Related Gear */}
-      {relatedProducts.length > 0 && (
-        <View style={styles.relatedSection}>
-          <Text style={styles.sectionHeaderTitle}>Related Gear</Text>
-          <View style={styles.relatedGrid}>
-            {relatedProducts.map(prod => (
-              <ProductCard key={prod._id || prod.id} product={prod} />
-            ))}
-          </View>
-        </View>
-      )}
+        )}
 
       </View>
     </ScreenContainer>
@@ -392,164 +399,69 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 90, paddingHorizontal: SPACING.md },
   pageContent: { paddingHorizontal: SPACING.md },
   center: { justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: COLORS.surface, marginTop: 10, fontSize: 16 },
+  loadingText: { color: COLORS.surface, marginTop: 10, "fontSize": 16 },
   grid: { gap: SPACING.xl },
   gallery: { gap: SPACING.md },
-  mainImageContainer: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  mainImageContainer: { width: '100%', aspectRatio: 1, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', justifyContent: 'center', alignItems: 'center' },
   mainImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  expandHint: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    color: '#fff',
-    fontSize: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
+  expandHint: { position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', "fontSize": 10, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 },
   thumbnails: { gap: SPACING.sm },
-  thumbBtn: {
-    width: 70,
-    height: 70,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surface,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-    padding: 4,
-  },
+  thumbBtn: { width: 70, height: 70, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', padding: 4 },
   thumbActive: { borderColor: COLORS.accent },
   thumbImage: { width: '100%', height: '100%', resizeMode: 'contain' },
   infoSection: { gap: SPACING.md },
-  badgeCategory: {
-    backgroundColor: 'rgba(230,57,70,0.15)',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.sm,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(230,57,70,0.3)',
-  },
-  badgeCategoryText: { color: COLORS.accent, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  productTitle: { fontSize: 26, fontWeight: '900', color: COLORS.surface, lineHeight: 32 },
+  badgeCategory: { backgroundColor: 'rgba(230,57,70,0.15)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: RADIUS.sm, alignSelf: 'flex-start', borderWidth: 1, borderColor: 'rgba(230,57,70,0.3)' },
+  badgeCategoryText: { color: COLORS.accent, "fontSize": 11, "fontWeight": '800', textTransform: 'uppercase' },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  productTitle: { flex: 1, "fontSize": 26, "fontWeight": '900', color: COLORS.surface, lineHeight: 32 },
+  shareBtn: { padding: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 50, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  ratingText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
-  priceTag: { fontSize: 28, fontWeight: '900', color: COLORS.surface },
-  stockStatus: { fontSize: 14, fontWeight: '700' },
+  ratingText: { color: 'rgba(255,255,255,0.7)', "fontSize": 14, "fontWeight": '600' },
+  priceTag: { "fontSize": 28, "fontWeight": '900', color: COLORS.surface },
+  stockStatus: { "fontSize": 14, "fontWeight": '700' },
   inStock: { color: COLORS.success },
   outStock: { color: COLORS.danger },
-  description: { color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 24 },
+  description: { color: 'rgba(255,255,255,0.7)', "fontSize": 15, lineHeight: 24 },
   actionButtons: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.sm },
-  btnCart: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    paddingVertical: 14,
-    borderRadius: RADIUS.sm,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  btnOrder: {
-    flex: 1,
-    backgroundColor: COLORS.accent,
-    paddingVertical: 14,
-    borderRadius: RADIUS.sm,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    ...SHADOWS.glow,
-  },
-  btnText: { color: COLORS.surface, fontSize: 14, fontWeight: '800', textTransform: 'uppercase' },
+  btnCart: { flex: 1, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingVertical: 14, borderRadius: RADIUS.sm, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  btnOrder: { flex: 1, backgroundColor: COLORS.accent, paddingVertical: 14, borderRadius: RADIUS.sm, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, ...SHADOWS.glow },
+  btnText: { color: COLORS.surface, "fontSize": 14, "fontWeight": '800', textTransform: 'uppercase' },
   disabled: { opacity: 0.5 },
-  
   reviewsSection: { marginTop: SPACING.xxl, paddingTop: SPACING.xl, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
-  sectionHeaderTitle: { fontSize: 22, fontWeight: '900', color: COLORS.surface, marginBottom: SPACING.lg },
-  reviewCardStyle: {
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.md,
-  },
-  formTitle: { fontSize: 18, fontWeight: '800', color: COLORS.surface, marginBottom: SPACING.md, paddingBottom: SPACING.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  sectionHeaderTitle: { "fontSize": 22, "fontWeight": '900', color: COLORS.surface, marginBottom: SPACING.lg },
+  reviewCardStyle: { backgroundColor: '#18181b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.md, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.md },
+  formTitle: { "fontSize": 18, "fontWeight": '800', color: COLORS.surface, marginBottom: SPACING.md, paddingBottom: SPACING.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   formGroup: { marginBottom: SPACING.md },
-  formLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', marginBottom: 8 },
+  formLabel: { "fontSize": 12, "fontWeight": '700', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', marginBottom: 8 },
   starsContainer: { flexDirection: 'row', gap: 6 },
-  textArea: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: RADIUS.sm,
-    color: COLORS.surface,
-    padding: SPACING.md,
-    fontSize: 15,
-    textAlignVertical: 'top',
-    minHeight: 90,
-  },
-  submitReviewBtn: {
-    backgroundColor: COLORS.accent,
-    paddingVertical: 14,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    ...SHADOWS.glow,
-  },
-  submitText: { color: COLORS.surface, fontWeight: '900', fontSize: 14, textTransform: 'uppercase' },
-  
+  textArea: { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.sm, color: COLORS.surface, padding: SPACING.md, "fontSize": 15, textAlignVertical: 'top', minHeight: 90 },
+  submitReviewBtn: { backgroundColor: COLORS.accent, paddingVertical: 14, borderRadius: RADIUS.sm, alignItems: 'center', ...SHADOWS.glow },
+  submitText: { color: COLORS.surface, "fontWeight": '900', "fontSize": 14, textTransform: 'uppercase' },
   reviewsList: { gap: SPACING.md, marginTop: SPACING.md },
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  verifiedLabel: { fontSize: 14, fontWeight: '800', color: COLORS.surface },
-  reviewerName: { fontSize: 13, fontWeight: '600', color: COLORS.warning, marginTop: 2 },
-  reviewDate: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  verifiedLabel: { "fontSize": 14, "fontWeight": '800', color: COLORS.surface },
+  reviewerName: { "fontSize": 13, "fontWeight": '600', color: COLORS.warning, marginTop: 2 },
+  reviewDate: { "fontSize": 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
   reviewActionsCol: { alignItems: 'flex-end', gap: 6 },
   starsRow: { flexDirection: 'row', gap: 2 },
-  deleteReviewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(230,57,70,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(230,57,70,0.2)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    gap: 4,
-  },
-  deleteReviewText: { color: COLORS.accent, fontSize: 11, fontWeight: '700' },
-  reviewComment: { color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 20 },
+  deleteReviewBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(230,57,70,0.1)', borderWidth: 1, borderColor: 'rgba(230,57,70,0.2)', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, gap: 4 },
+  deleteReviewText: { color: COLORS.accent, "fontSize": 11, "fontWeight": '700' },
+  reviewComment: { color: 'rgba(255,255,255,0.8)', "fontSize": 14, lineHeight: 20 },
   reviewPhotoThumb: { width: 90, height: 90, borderRadius: 8, marginTop: 12, resizeMode: 'cover' },
   noReviewsBox: { padding: SPACING.xl, alignItems: 'center', backgroundColor: '#18181b', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   noReviewsText: { color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', textAlign: 'center' },
-
   relatedSection: { marginTop: SPACING.xxl, paddingTop: SPACING.xl, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
   relatedGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: SPACING.lg },
   customModal: { backgroundColor: '#18181b', borderRadius: RADIUS.lg, padding: SPACING.xl, width: '100%', maxWidth: 360, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   modalCloseBtn: { position: 'absolute', top: 12, right: 12 },
-  modalTitle: { fontSize: 20, fontWeight: '900', color: COLORS.surface, textAlign: 'center', marginBottom: 8 },
-  modalText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginBottom: SPACING.xl, lineHeight: 20 },
+  modalTitle: { "fontSize": 20, "fontWeight": '900', color: COLORS.surface, textAlign: 'center', marginBottom: 8 },
+  modalText: { color: 'rgba(255,255,255,0.7)', "fontSize": 14, textAlign: 'center', marginBottom: SPACING.xl, lineHeight: 20 },
   modalActions: { flexDirection: 'row', gap: SPACING.sm },
   btnCancel: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 12, borderRadius: RADIUS.sm, alignItems: 'center' },
-  btnCancelText: { color: COLORS.surface, fontWeight: '800', fontSize: 14 },
+  btnCancelText: { color: COLORS.surface, "fontWeight": '800', "fontSize": 14 },
   btnConfirmDelete: { flex: 1, backgroundColor: COLORS.accent, paddingVertical: 12, borderRadius: RADIUS.sm, alignItems: 'center' },
-  btnConfirmText: { color: COLORS.surface, fontWeight: '800', fontSize: 14 },
-
+  btnConfirmText: { color: COLORS.surface, "fontWeight": '800', "fontSize": 14 },
   fullscreenModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   fsClose: { position: 'absolute', top: 40, right: 25, zIndex: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20 },
   fsPrev: { position: 'absolute', left: 20, zIndex: 10, padding: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 25 },

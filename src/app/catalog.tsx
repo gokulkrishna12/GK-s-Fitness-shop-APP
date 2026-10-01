@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TextInput, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Search } from 'lucide-react-native';
-import api from '../services/api';
-import ProductCard from '../components/ProductCard';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Footer from '../components/Footer';
-import { COLORS, SPACING, RADIUS } from '../constants/theme';
+import ProductCard from '../components/ProductCard';
+import { COLORS, RADIUS, SPACING } from '../constants/theme';
 import { Product } from '../context/ShopContext';
+import api from '../services/api';
 
 const CATEGORIES = [
   'ALL',
@@ -22,6 +22,7 @@ export default function CatalogScreen() {
   const params = useLocalSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
@@ -31,22 +32,28 @@ export default function CatalogScreen() {
     }
   }, [params.category]);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get('/products');
-        const fetchedProducts = res.data.products || res.data || [];
-        setProducts(fetchedProducts);
-      } catch (error) {
-        console.error('Failed to fetch products', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
+  const fetchProducts = useCallback(async (isRefreshing = false) => {
+    try {
+      if (!isRefreshing) setLoading(true);
+      const res = await api.get('/products');
+      const fetchedProducts = res.data.products || res.data || [];
+      setProducts(fetchedProducts);
+    } catch (error) {
+      console.error('Failed to fetch products', error);
+    } finally {
+      if (!isRefreshing) setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchProducts(true);
+  }, [fetchProducts]);
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -78,7 +85,7 @@ export default function CatalogScreen() {
         </View>
       </View>
 
-      {/* 🏷️ Website-style Horizontal Category Chips */}
+      {/* 🏷️ Horizontal Category Chips */}
       <View style={styles.categoryScrollContainer}>
         <ScrollView
           horizontal
@@ -115,6 +122,14 @@ export default function CatalogScreen() {
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => <ProductCard product={item} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.accent}
+              colors={[COLORS.accent]}
+            />
+          }
           ListEmptyComponent={
             <Text style={styles.emptyText}>No products found in this category.</Text>
           }
@@ -131,19 +146,19 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md },
   title: { fontSize: 24, fontWeight: '900', color: COLORS.surface, textTransform: 'uppercase' },
   searchRow: { flexDirection: 'row', paddingHorizontal: SPACING.md, marginTop: SPACING.sm, marginBottom: SPACING.sm },
-  searchBar: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: 'rgba(255,255,255,0.05)', 
-    borderRadius: RADIUS.md, 
-    paddingHorizontal: SPACING.md, 
-    height: 44, 
-    borderWidth: 1, 
-    borderColor: 'rgba(255,255,255,0.1)' 
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    height: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
   },
   searchInput: { flex: 1, marginLeft: SPACING.sm, color: COLORS.surface },
-  
+
   categoryScrollContainer: { marginBottom: SPACING.md },
   categoryContent: { paddingHorizontal: SPACING.md, gap: 8, alignItems: 'center' },
   categoryChip: {
