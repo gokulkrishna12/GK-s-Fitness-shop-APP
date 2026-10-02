@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Eye, EyeOff, Fingerprint, Globe, Lock, LogIn, Mail } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -23,7 +23,6 @@ export default function Login() {
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const { login } = useAuth();
 
-  // Handle Deep Linking callback for Google OAuth token synchronization
   useEffect(() => {
     const handleDeepLink = async (event: { url: string }) => {
       let data = Linking.parse(event.url);
@@ -33,7 +32,6 @@ export default function Login() {
           try {
             let userData = userStr ? JSON.parse(decodeURIComponent(userStr as string)) : null;
             if (!userData) {
-              // Fallback fetch profile if user object isn't parsed correctly
               api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
               const profileRes = await api.get('/auth/profile');
               userData = profileRes.data;
@@ -52,7 +50,6 @@ export default function Login() {
 
     const sub = Linking.addEventListener('url', handleDeepLink);
 
-    // Check initial URL if app was opened via deep link from cold start
     Linking.getInitialURL().then(async (url) => {
       if (url) handleDeepLink({ url });
     });
@@ -62,7 +59,6 @@ export default function Login() {
     };
   }, []);
 
-  // Check biometric support
   useEffect(() => {
     (async () => {
       const compatible = await LocalAuthentication.hasHardwareAsync();
@@ -96,11 +92,11 @@ export default function Login() {
     }
   };
 
-  // Trigger Google OAuth WebBrowser flow
   const handleGoogleLogin = async () => {
     try {
       const redirectUri = Linking.createURL('/Auth/login');
-      const authUrl = `https://your-backend-api.com/api/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const backendBase = api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, '') : 'http://YOUR_EC2_IP:5000/api';
+      const authUrl = `${backendBase}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
       if (result.type === 'success' && result.url) {
@@ -114,24 +110,33 @@ export default function Login() {
 
   const handleBiometricLogin = async () => {
     try {
+      // 1. Check for the session BEFORE opening the scanner
+      const savedToken = await AsyncStorage.getItem('token');
+      const savedUserStr = await AsyncStorage.getItem('user');
+
+      // 2. If no session exists, throw the Alert and stop the function
+      if (!savedToken || !savedUserStr) {
+        Alert.alert(
+          "First Time Login",
+          "Please login with your email and password at least once to activate biometric unlock.",
+          [{ text: "Got it!", style: "default" }]
+        );
+        return;
+      }
+
+      // 3. If a session exists, open the scanner
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Unlock GK's Fitness",
         fallbackLabel: "Use Password",
       });
 
+      // 4. Log them in automatically
       if (result.success) {
         setIsLoading(true);
-        const savedToken = await AsyncStorage.getItem('token');
-        const savedUserStr = await AsyncStorage.getItem('user');
-
-        if (savedToken && savedUserStr) {
-          const savedUser = JSON.parse(savedUserStr);
-          await login(savedUser, savedToken);
-          Toast.show({ type: 'success', text1: 'Biometric Login Successful!' });
-          router.replace('/' as any);
-        } else {
-          Toast.show({ type: 'error', text1: 'No saved session found. Please login via password first.' });
-        }
+        const savedUser = JSON.parse(savedUserStr);
+        await login(savedUser, savedToken);
+        Toast.show({ type: 'success', text1: 'Biometric Login Successful!' });
+        router.replace('/' as any);
       }
     } catch (error) {
       console.error('Biometric error:', error);
@@ -201,7 +206,6 @@ export default function Login() {
                   )}
                 </TouchableOpacity>
 
-                {/* Google OAuth Button */}
                 <TouchableOpacity style={styles.btnGoogle} onPress={handleGoogleLogin}>
                   <Globe color={COLORS.surface} size={18} />
                   <Text style={styles.btnText}>Continue with Google</Text>

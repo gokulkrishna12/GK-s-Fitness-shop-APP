@@ -53,9 +53,11 @@ const OrderTracker = ({ status, cancelReason }: { status: string, cancelReason?:
   if (status === 'Cancelled') {
     return (
       <View style={styles.cancelBadge}>
-        <XCircle size={18} color={COLORS.accent} />
-        <Text style={styles.cancelTitle}>Order Cancelled: </Text>
-        <Text style={styles.cancelReasonText}>{cancelReason ? cancelReason : 'No reason provided.'}</Text>
+        <XCircle size={20} color={COLORS.accent} style={{ marginTop: 2 }} />
+        <View style={styles.cancelTextContainer}>
+          <Text style={styles.cancelTitle}>Order Cancelled</Text>
+          <Text style={styles.cancelReasonText}>{cancelReason ? cancelReason : 'No reason provided.'}</Text>
+        </View>
       </View>
     );
   }
@@ -468,19 +470,23 @@ const styles = StyleSheet.create({
   stepActiveBox: { backgroundColor: 'rgba(230,57,70,0.1)', borderColor: COLORS.accent },
   stepLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
 
+  // 🔥 FIXED: Added flex-start and a flex container to prevent text overflow
   cancelBadge: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-start',
+    gap: 10,
     backgroundColor: 'rgba(230,57,70,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(230,57,70,0.2)',
     borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
+    padding: SPACING.md,
     marginTop: SPACING.md,
   },
-  cancelTitle: { color: COLORS.accent, fontWeight: '800', fontSize: 13, textTransform: 'uppercase' },
-  cancelReasonText: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  cancelTextContainer: {
+    flex: 1,
+  },
+  cancelTitle: { color: COLORS.danger, fontWeight: '800', fontSize: 12, textTransform: 'uppercase', marginBottom: 2 },
+  cancelReasonText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, lineHeight: 18 },
 
   footerActions: { marginTop: SPACING.lg, alignItems: 'flex-end' },
   cancelOrderBtn: {
