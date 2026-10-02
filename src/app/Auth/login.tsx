@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Fingerprint, Lock, LogIn, Mail } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { Eye, EyeOff, Fingerprint, Globe, Lock, LogIn, Mail } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
@@ -10,6 +12,7 @@ import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
+WebBrowser.maybeCompleteAuthSession();
 const heroImg = require('../../../assets/images/Home.jpg');
 
 export default function Login() {
@@ -20,14 +23,51 @@ export default function Login() {
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const { login } = useAuth();
 
-  // Check if hardware supports biometrics on mount
+  // Handle Deep Linking callback for Google OAuth token synchronization
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      let data = Linking.parse(event.url);
+      if (data.queryParams) {
+        const { token, user: userStr } = data.queryParams;
+        if (token && typeof token === 'string') {
+          try {
+            let userData = userStr ? JSON.parse(decodeURIComponent(userStr as string)) : null;
+            if (!userData) {
+              // Fallback fetch profile if user object isn't parsed correctly
+              api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+              const profileRes = await api.get('/auth/profile');
+              userData = profileRes.data;
+            }
+
+            await login(userData, token);
+            Toast.show({ type: 'success', text1: 'Google Login Successful!' });
+            router.replace('/' as any);
+          } catch (err) {
+            console.error('OAuth token parse error:', err);
+            Toast.show({ type: 'error', text1: 'Google Authentication Failed' });
+          }
+        }
+      }
+    };
+
+    const sub = Linking.addEventListener('url', handleDeepLink);
+
+    // Check initial URL if app was opened via deep link from cold start
+    Linking.getInitialURL().then(async (url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
+  // Check biometric support
   useEffect(() => {
     (async () => {
       const compatible = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (compatible && enrolled) {
-        setIsBiometricSupported(true);
-      }
+      if (compatible && enrolled) setIsBiometricSupported(true);
     })();
   }, []);
 
@@ -41,15 +81,9 @@ export default function Login() {
     try {
       setIsLoading(true);
       const response = await api.post('/auth/login', { email: formattedEmail, password });
-
       const { user, token } = response.data;
 
-      // Save credentials for future biometric logins before triggering context
-      await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-
       await login(user, token);
-
       Toast.show({ type: 'success', text1: 'Welcome back Athlete!' });
       router.replace('/' as any);
     } catch (error: any) {
@@ -62,6 +96,22 @@ export default function Login() {
     }
   };
 
+  // Trigger Google OAuth WebBrowser flow
+  const handleGoogleLogin = async () => {
+    try {
+      const redirectUri = Linking.createURL('/Auth/login');
+      const authUrl = `https://your-backend-api.com/api/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      if (result.type === 'success' && result.url) {
+        // Deep link listener will catch the URL payload
+      }
+    } catch (error) {
+      console.error('Google OAuth error:', error);
+      Toast.show({ type: 'error', text1: 'Could not launch Google Login' });
+    }
+  };
+
   const handleBiometricLogin = async () => {
     try {
       const result = await LocalAuthentication.authenticateAsync({
@@ -71,22 +121,16 @@ export default function Login() {
 
       if (result.success) {
         setIsLoading(true);
-        // Grab the saved session from the last manual login
         const savedToken = await AsyncStorage.getItem('token');
         const savedUserStr = await AsyncStorage.getItem('user');
 
         if (savedToken && savedUserStr) {
           const savedUser = JSON.parse(savedUserStr);
           await login(savedUser, savedToken);
-
           Toast.show({ type: 'success', text1: 'Biometric Login Successful!' });
           router.replace('/' as any);
         } else {
-          Toast.show({
-            type: 'error',
-            text1: 'No saved session found',
-            text2: 'Please login with your password once to enable biometrics.'
-          });
+          Toast.show({ type: 'error', text1: 'No saved session found. Please login via password first.' });
         }
       }
     } catch (error) {
@@ -157,23 +201,17 @@ export default function Login() {
                   )}
                 </TouchableOpacity>
 
-                {isBiometricSupported && (
-                  <>
-                    <View style={styles.dividerContainer}>
-                      <View style={styles.divider} />
-                      <Text style={styles.dividerText}>OR</Text>
-                      <View style={styles.divider} />
-                    </View>
+                {/* Google OAuth Button */}
+                <TouchableOpacity style={styles.btnGoogle} onPress={handleGoogleLogin}>
+                  <Globe color={COLORS.surface} size={18} />
+                  <Text style={styles.btnText}>Continue with Google</Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.btnBiometric, isLoading && styles.btnDisabled]}
-                      onPress={handleBiometricLogin}
-                      disabled={isLoading}
-                    >
-                      <Fingerprint color={COLORS.surface} size={20} />
-                      <Text style={styles.btnBiometricText}>Login with Biometrics</Text>
-                    </TouchableOpacity>
-                  </>
+                {isBiometricSupported && (
+                  <TouchableOpacity style={styles.btnBiometric} onPress={handleBiometricLogin}>
+                    <Fingerprint color={COLORS.surface} size={20} />
+                    <Text style={styles.btnBiometricText}>Login with Biometrics</Text>
+                  </TouchableOpacity>
                 )}
               </View>
 
@@ -201,7 +239,7 @@ const styles = StyleSheet.create({
   brandTitle: { fontSize: 14, fontWeight: '800', color: COLORS.accent, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
   title: { fontSize: 28, fontWeight: '900', color: COLORS.surface, marginBottom: 8 },
   quote: { fontSize: 14, color: 'rgba(255, 255, 255, 0.7)', fontStyle: 'italic', textAlign: 'center', lineHeight: 20 },
-  form: { gap: SPACING.lg },
+  form: { gap: SPACING.md },
   inputGroup: { gap: 6 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { fontSize: 14, fontWeight: '600', color: 'rgba(255, 255, 255, 0.85)' },
@@ -211,16 +249,11 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: COLORS.surface, fontSize: 16, paddingHorizontal: 12 },
   eyeBtn: { padding: 16 },
   btnAuth: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.accent, paddingVertical: 14, borderRadius: RADIUS.sm, gap: 8, marginTop: 8, ...SHADOWS.glow },
+  btnGoogle: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#4285F4', paddingVertical: 14, borderRadius: RADIUS.sm, gap: 8 },
+  btnBiometric: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingVertical: 14, borderRadius: RADIUS.sm, gap: 8 },
   btnDisabled: { opacity: 0.5 },
   btnText: { color: COLORS.surface, fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-
-  // NEW STYLES FOR BIOMETRICS
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
-  divider: { flex: 1, height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' },
-  dividerText: { color: 'rgba(255, 255, 255, 0.5)', paddingHorizontal: SPACING.md, fontSize: 12, fontWeight: '700' },
-  btnBiometric: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingVertical: 14, borderRadius: RADIUS.sm, gap: 8 },
   btnBiometricText: { color: COLORS.surface, fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: SPACING.xl },
   footerText: { color: 'rgba(255, 255, 255, 0.55)', fontSize: 14 },
   footerLink: { color: COLORS.accent, fontSize: 14, fontWeight: '700' }

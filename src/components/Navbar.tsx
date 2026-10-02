@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { router, usePathname } from 'expo-router';
-import { Dumbbell, ShoppingCart, Heart, User, LogOut, Menu, X, LayoutDashboard, ShoppingBag } from 'lucide-react-native';
-import { useShop } from '../context/ShopContext';
+import { Dumbbell, Heart, LayoutDashboard, LogOut, Menu, ShoppingBag, ShoppingCart, User, X } from 'lucide-react-native';
+import { useState } from 'react';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { useShop } from '../context/ShopContext';
 
 export default function Navbar() {
   const { getCartCount, wishlist } = useShop();
@@ -19,7 +19,7 @@ export default function Navbar() {
     setMobileMenuOpen(false);
     setTimeout(() => {
       router.push(route as any);
-    }, 150); 
+    }, 150);
   };
 
   const handleLogout = async () => {
@@ -33,7 +33,7 @@ export default function Navbar() {
   return (
     <View style={styles.navbar}>
       <View style={styles.inner}>
-        
+
         {/* Brand Logo - Fixed Clipping */}
         <TouchableOpacity style={styles.logoContainer} onPress={() => handleNav('/')} activeOpacity={0.8}>
           <View style={styles.iconPaddingWrapper}>
@@ -47,8 +47,8 @@ export default function Navbar() {
         {/* Quick Action Icons & Products Link */}
         <View style={styles.rightActions}>
           {/* 🛍️ Top Header Products Icon Only */}
-          <TouchableOpacity 
-            style={[styles.productsBtn, pathname === '/catalog' && styles.productsBtnActive]} 
+          <TouchableOpacity
+            style={[styles.productsBtn, pathname === '/catalog' && styles.productsBtnActive]}
             onPress={() => handleNav('/catalog')}
             activeOpacity={0.8}
           >
@@ -89,7 +89,7 @@ export default function Navbar() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.drawerContent}>
-            
+
             <View style={styles.drawerHeader}>
               <Text style={styles.drawerTitle}>Navigation Menu</Text>
               <TouchableOpacity onPress={() => setMobileMenuOpen(false)}>
@@ -118,7 +118,8 @@ export default function Navbar() {
                 <Text style={styles.drawerText}>My Orders</Text>
               </TouchableOpacity>
 
-              {isAdmin && (
+              {/* 🔥 DB-Driven Admin Role Check */}
+              {isAuthenticated && isAdmin && (
                 <TouchableOpacity style={styles.drawerItem} onPress={() => handleNav('/admin')}>
                   <LayoutDashboard size={18} color={COLORS.warning} />
                   <Text style={[styles.drawerText, { color: COLORS.warning }]}>Admin Dashboard</Text>
@@ -166,10 +167,8 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 15, fontWeight: '800', color: COLORS.surface, letterSpacing: 0.5 },
   logoBold: { color: COLORS.accent, fontWeight: '900' },
   rightActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  
   productsBtn: { padding: 6, borderRadius: RADIUS.sm, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   productsBtnActive: { borderColor: COLORS.accent, backgroundColor: 'rgba(230,57,70,0.15)' },
-
   iconButton: { position: 'relative', padding: 6 },
   badge: { position: 'absolute', top: 0, right: 0, backgroundColor: COLORS.accent, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   badgeText: { color: COLORS.surface, fontSize: 10, fontWeight: '800' },

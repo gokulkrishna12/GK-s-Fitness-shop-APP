@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { User, Lock, Mail, Shield, CheckCircle, Eye, EyeOff } from 'lucide-react-native';
+import { CheckCircle, Eye, EyeOff, Lock, Mail, Shield, User } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
-import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import ScreenContainer from '../components/ScreenContainer';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function ProfileScreen() {
-  const { user } = useAuth();
+  // 🔥 Pulled isAdmin directly from context for DB-driven RBAC
+  const { user, isAdmin } = useAuth();
   const [name, setName] = useState(user?.name || '');
 
   const [password, setPassword] = useState('');
@@ -44,7 +45,8 @@ export default function ProfileScreen() {
     }
   };
 
-  const accountType = user?.isAdmin || user?.role === 'admin' ? 'Staff (Admin)' : 'Athlete (Customer)';
+  // 🔥 Completely removed hardcoded checks, relying purely on context
+  const accountType = isAdmin ? 'Staff (Admin)' : 'Athlete (Customer)';
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
@@ -91,9 +93,9 @@ export default function ProfileScreen() {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Account Type</Text>
                 <View style={[styles.inputWrapper, styles.disabledWrapper]}>
-                  <Shield size={16} color="rgba(255,255,255,0.4)" style={styles.inputIcon} />
+                  <Shield size={16} color={isAdmin ? COLORS.warning : "rgba(255,255,255,0.4)"} style={styles.inputIcon} />
                   <TextInput
-                    style={[styles.input, styles.disabledInput]}
+                    style={[styles.input, styles.disabledInput, isAdmin && { color: COLORS.warning, fontWeight: '700' }]}
                     value={accountType}
                     editable={false}
                   />
@@ -156,7 +158,6 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-
       </ScreenContainer>
     </KeyboardAvoidingView>
   );
@@ -168,45 +169,20 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: SPACING.lg, paddingVertical: SPACING.md },
   headerTitle: { fontSize: 28, fontWeight: '900', color: COLORS.surface, textTransform: 'uppercase', marginBottom: 6 },
   headerSubtitle: { color: 'rgba(255,255,255,0.6)', fontSize: 15, textAlign: 'center' },
-  card: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    padding: SPACING.lg,
-    ...SHADOWS.md,
-  },
+  card: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: SPACING.lg, ...SHADOWS.md },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACING.md },
   cardTitle: { fontSize: 18, fontWeight: '800', color: COLORS.surface, textTransform: 'uppercase' },
   securityHeader: { marginTop: SPACING.xl, paddingTop: SPACING.lg, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
   form: { gap: SPACING.md },
   inputGroup: { gap: 6 },
   label: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)' },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: RADIUS.sm,
-    height: 50,
-  },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.sm, height: 50 },
   disabledWrapper: { backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'transparent' },
   inputIcon: { marginLeft: 16, marginRight: 4 },
   input: { flex: 1, color: COLORS.surface, fontSize: 16, paddingHorizontal: 12 },
   disabledInput: { color: 'rgba(255,255,255,0.4)' },
   eyeBtn: { padding: 16 },
-  submitBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
-    paddingVertical: 14,
-    borderRadius: RADIUS.sm,
-    gap: 10,
-    marginTop: SPACING.sm,
-    ...SHADOWS.glow,
-  },
+  submitBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.accent, paddingVertical: 14, borderRadius: RADIUS.sm, gap: 10, marginTop: SPACING.sm, ...SHADOWS.glow },
   btnDisabled: { opacity: 0.7 },
   submitText: { color: COLORS.surface, fontSize: 16, fontWeight: '900', textTransform: 'uppercase' },
 });

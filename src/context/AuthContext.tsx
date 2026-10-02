@@ -1,71 +1,96 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import api from '../services/api';
 
-interface AuthContextType {
-  user: any;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
-  login: (userData: any, token: string) => Promise<void>;
-  logout: () => Promise<void>;
+interface User {
+  _id?: string;
+  id?: string;
+  name: string;
+  email: string;
+  role?: string; // Database role from MongoDB (e.g., 'admin', 'customer')
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+  login: (userData: User, authToken: string) => Promise<void>;
+  logout: () => Promise<void>;
+  loading: boolean;
+}
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isAdmin: false,
+  login: async () => { },
+  logout: async () => { },
+  loading: true,
+});
 
-  // Initial Load when the app opens
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load stored session on app startup
   useEffect(() => {
-    const loadLocalUser = async () => {
+    const loadStoredAuth = async () => {
       try {
+        const storedToken = await AsyncStorage.getItem('token');
         const storedUser = await AsyncStorage.getItem('user');
-        const token = await AsyncStorage.getItem('token');
 
-        if (storedUser && token) {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-          setIsAdmin(parsedUser.role === 'admin' || parsedUser.isAdmin === true || parsedUser.email === 'gokuldinesh32@gmail.com');
-          setIsAuthenticated(true);
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
         }
       } catch (error) {
-        console.error('Failed to load user from storage', error);
+        console.error('Failed to load storage auth', error);
+      } finally {
+        setLoading(false);
       }
     };
-    loadLocalUser();
+
+    loadStoredAuth();
   }, []);
 
-  const login = async (userData: any, token: string) => {
-    // 🔥 THE FIX: We MUST await these so the token is physically on the device
-    // BEFORE the ShopContext tries to make database calls!
-    await AsyncStorage.setItem('user', JSON.stringify(userData));
-    await AsyncStorage.setItem('token', token);
+  const login = async (userData: User, authToken: string) => {
+    try {
+      setToken(authToken);
+      setUser(userData);
+      api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
-    setUser(userData);
-    setIsAdmin(userData.role === 'admin' || userData.isAdmin === true || userData.email === 'gokuldinesh32@gmail.com');
-    setIsAuthenticated(true);
+      await AsyncStorage.setItem('token', authToken);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Login storage error:', error);
+    }
   };
 
   const logout = async () => {
-    // 🔥 Wipes everything clean instantly
-    await AsyncStorage.multiRemove(['user', 'token', 'shop_cart', 'shop_wishlist']);
-    setUser(null);
-    setIsAdmin(false);
-    setIsAuthenticated(false);
+    try {
+      setToken(null);
+      setUser(null);
+      delete api.defaults.headers.common['Authorization'];
+
+      await AsyncStorage.multiRemove(['token', 'user', 'shop_cart', 'shop_wishlist']);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
+  // Database-driven RBAC check (Completely independent of hardcoded emails)
+  const isAdmin = user?.role === 'admin';
+  const isAuthenticated = !!token && !!user;
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isAdmin, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isAdmin, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
