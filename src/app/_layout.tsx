@@ -11,7 +11,6 @@ import Navbar from '../components/Navbar';
 import { AuthProvider } from '../context/AuthContext';
 import { ShopProvider } from '../context/ShopContext';
 
-// Removed strict TypeScript return type to allow Expo to infer the version-specific behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -23,11 +22,10 @@ Notifications.setNotificationHandler({
 export default function RootLayout() {
 
   useEffect(() => {
+    // Triggers the native permission popup on first launch
     registerForPushNotificationsAsync().then(token => {
       if (token) {
-        console.log('🔥 EXPO PUSH TOKEN:', token);
-        // TODO: Once your backend AI finishes the push route, you can send the token here:
-        // api.post('/users/push-token', { expoPushToken: token }).catch(console.error);
+        console.log('📱 OS Push Permission Granted');
       }
     });
   }, []);
@@ -54,7 +52,6 @@ export default function RootLayout() {
   );
 }
 
-// Standard Expo Push Notification Generator Function
 async function registerForPushNotificationsAsync() {
   let token;
 

@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../services/api';
 
@@ -7,7 +10,7 @@ interface User {
   id?: string;
   name: string;
   email: string;
-  role?: string; // Database role from MongoDB (e.g., 'admin', 'customer')
+  role?: string;
 }
 
 interface AuthContextType {
@@ -35,7 +38,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load stored session on app startup
+  // 🔥 NEW: Background function to safely sync the Push Token to MongoDB
+  const syncPushToken = async () => {
+    try {
+      if (!Device.isDevice) return;
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+
+      // Post the token to the correct /auth/push-token backend route
+      await api.post('/auth/push-token', { expoPushToken: tokenData.data });
+      console.log("✅ Push Token successfully saved to MongoDB!");
+    } catch (error) {
+      console.log('⚠️ Push token sync failed:', error);
+    }
+  };
+
   useEffect(() => {
     const loadStoredAuth = async () => {
       try {
@@ -46,6 +66,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+          // 🔥 Automatically sync token when app restores session
+          syncPushToken();
         }
       } catch (error) {
         console.error('Failed to load storage auth', error);
@@ -65,6 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       await AsyncStorage.setItem('token', authToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+      // 🔥 Automatically sync token instantly upon manual login
+      syncPushToken();
     } catch (error) {
       console.error('Login storage error:', error);
     }
@@ -82,7 +108,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Database-driven RBAC check (Completely independent of hardcoded emails)
   const isAdmin = user?.role === 'admin';
   const isAuthenticated = !!token && !!user;
 
