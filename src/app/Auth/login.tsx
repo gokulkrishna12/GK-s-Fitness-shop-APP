@@ -105,14 +105,14 @@ export default function Login() {
 
   const handleBiometricLogin = async () => {
     try {
-      // 🔥 Pulls the backup token that survives logout
+      // Pulls the backup token that survives logout
       const savedToken = await AsyncStorage.getItem('biometric_token');
       const savedUserStr = await AsyncStorage.getItem('biometric_user');
 
       if (!savedToken || !savedUserStr) {
         Alert.alert(
           "First Time Login",
-          "Please login at least once (via Email or Google) to activate biometric unlock.",
+          "Please login at least once via Google or manually with your email to activate biometric unlock.",
           [{ text: "Got it!", style: "default" }]
         );
         return;
