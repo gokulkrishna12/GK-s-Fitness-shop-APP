@@ -8,6 +8,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import ChatAssistant from '../components/ChatAssistant';
 import Navbar from '../components/Navbar';
+import OfflineAlert from '../components/OfflineAlert'; // 🔥 NEW: Imported Offline Alert
 import { AuthProvider } from '../context/AuthContext';
 import { ShopProvider } from '../context/ShopContext';
 
@@ -36,6 +37,9 @@ export default function RootLayout() {
         <ShopProvider>
           <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
             <StatusBar barStyle="light-content" backgroundColor="#140e0a" />
+
+            {/* 🔥 NEW: Sits globally at the top of the app under the status bar */}
+            <OfflineAlert />
 
             <Navbar />
 
