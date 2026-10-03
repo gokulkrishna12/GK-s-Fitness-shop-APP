@@ -54,9 +54,7 @@ export default function Login() {
       if (url) handleDeepLink({ url });
     });
 
-    return () => {
-      sub.remove();
-    };
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -99,9 +97,6 @@ export default function Login() {
       const authUrl = `${backendBase}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-      if (result.type === 'success' && result.url) {
-        // Deep link listener will catch the URL payload
-      }
     } catch (error) {
       console.error('Google OAuth error:', error);
       Toast.show({ type: 'error', text1: 'Could not launch Google Login' });
@@ -110,27 +105,24 @@ export default function Login() {
 
   const handleBiometricLogin = async () => {
     try {
-      // 1. Check for the session BEFORE opening the scanner
-      const savedToken = await AsyncStorage.getItem('token');
-      const savedUserStr = await AsyncStorage.getItem('user');
+      // 🔥 Pulls the backup token that survives logout
+      const savedToken = await AsyncStorage.getItem('biometric_token');
+      const savedUserStr = await AsyncStorage.getItem('biometric_user');
 
-      // 2. If no session exists, throw the Alert and stop the function
       if (!savedToken || !savedUserStr) {
         Alert.alert(
           "First Time Login",
-          "Please login with your email and password at least once to activate biometric unlock.",
+          "Please login at least once (via Email or Google) to activate biometric unlock.",
           [{ text: "Got it!", style: "default" }]
         );
         return;
       }
 
-      // 3. If a session exists, open the scanner
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Unlock GK's Fitness",
         fallbackLabel: "Use Password",
       });
 
-      // 4. Log them in automatically
       if (result.success) {
         setIsLoading(true);
         const savedUser = JSON.parse(savedUserStr);

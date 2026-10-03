@@ -38,7 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 NEW: Background function to safely sync the Push Token to MongoDB
   const syncPushToken = async () => {
     try {
       if (!Device.isDevice) return;
@@ -48,7 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
       const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
-      // Post the token to the correct /auth/push-token backend route
       await api.post('/auth/push-token', { expoPushToken: tokenData.data });
       console.log("✅ Push Token successfully saved to MongoDB!");
     } catch (error) {
@@ -66,8 +64,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-
-          // 🔥 Automatically sync token when app restores session
           syncPushToken();
         }
       } catch (error) {
@@ -76,7 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     };
-
     loadStoredAuth();
   }, []);
 
@@ -86,10 +81,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData);
       api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
+      // 1. Save active session
       await AsyncStorage.setItem('token', authToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
-      // 🔥 Automatically sync token instantly upon manual login
+      // 🔥 2. Save Biometric Backup (Survives Logout)
+      await AsyncStorage.setItem('biometric_token', authToken);
+      await AsyncStorage.setItem('biometric_user', JSON.stringify(userData));
+
       syncPushToken();
     } catch (error) {
       console.error('Login storage error:', error);
@@ -102,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       delete api.defaults.headers.common['Authorization'];
 
+      // 🔥 Note: We DO NOT delete 'biometric_token' or 'biometric_user' here
       await AsyncStorage.multiRemove(['token', 'user', 'shop_cart', 'shop_wishlist']);
     } catch (error) {
       console.error('Logout error:', error);
