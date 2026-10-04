@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CreditCard, MapPin, Truck } from 'lucide-react-native';
-import Toast from 'react-native-toast-message';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
-import { useShop, CartItem } from '../context/ShopContext';
-import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import Toast from 'react-native-toast-message';
 import ScreenContainer from '../components/ScreenContainer';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
+import { CartItem, useShop } from '../context/ShopContext';
+import api from '../services/api';
 
 export default function CheckoutScreen() {
   const { cart, clearCart } = useShop();
@@ -24,7 +24,7 @@ export default function CheckoutScreen() {
 
   let directItem: CartItem | null = null;
   if (params.directItem && typeof params.directItem === 'string') {
-    try { directItem = JSON.parse(params.directItem); } catch (e) {}
+    try { directItem = JSON.parse(params.directItem); } catch (e) { }
   }
 
   const checkoutItems: CartItem[] = directItem ? [directItem] : cart;
@@ -55,9 +55,11 @@ export default function CheckoutScreen() {
         image: item.product.image || item.product.images?.[0] || 'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=200&q=80',
       }));
 
-      // 1. Create the Razorpay Order ID on your EC2 backend
+      // 1. Initial Handshake: Lock the order on the backend BEFORE opening Razorpay
       const { data: orderData } = await api.post('/payment/create-order', {
-        orderItems: formattedOrderItems, shippingAddress, totalAmount: Number(totalAmount)
+        orderItems: formattedOrderItems,
+        shippingAddress,
+        totalAmount: Number(totalAmount)
       });
 
       // 2. Open Real Razorpay UI
@@ -65,7 +67,7 @@ export default function CheckoutScreen() {
         description: "GK's Fitness Order",
         image: 'https://i.imgur.com/3g7nmJC.png',
         currency: orderData.currency || 'INR',
-        key: 'rzp_test_TWQwCw6M7RKVkV', 
+        key: 'rzp_test_TWQwCw6M7RKVkV',
         amount: orderData.amount,
         name: "GK's Fitness",
         order_id: orderData.razorpayOrderId,
@@ -77,17 +79,14 @@ export default function CheckoutScreen() {
       RazorpayCheckout.open(options).then(async (data: any) => {
         try {
           Toast.show({ type: 'info', text1: 'Verifying payment...' });
-          
-          // 4. Send signature to backend to verify and save to MongoDB
+
+          // 4. Verification: ONLY send the 3 signature strings. The backend already knows the cart.
           const verifyRes = await api.post('/payment/verify-payment', {
-            razorpay_order_id: data.razorpay_order_id, 
+            razorpay_order_id: data.razorpay_order_id,
             razorpay_payment_id: data.razorpay_payment_id,
-            razorpay_signature: data.razorpay_signature, 
-            orderItems: formattedOrderItems, 
-            shippingAddress, 
-            totalAmount: Number(totalAmount)
+            razorpay_signature: data.razorpay_signature
           });
-          
+
           if (verifyRes.status === 200) {
             setPaymentSuccess(true);
             Toast.show({ type: 'success', text1: 'Order placed successfully!' });
